@@ -1,0 +1,209 @@
+# Copyright NiceSOFT. All Rights Reserved.
+# SPDX-License-Identifier: APACHE-2.0
+#
+# =============================================================================
+#  NiceOS · Redis Cluster — Reference docker-compose.yml
+# =============================================================================
+#  What this file gives you
+#  ------------------------
+#  • A 6-node Redis Cluster (N replicas per master; here replicas=1 → 3 masters + 3 replicas).
+#  • One node (r1) designated as the cluster creator. Others join automatically.
+#  • Persistent data via named volumes: one per node.
+#  • Clean, deterministic networking on a dedicated user bridge (rnet).
+#
+#  Quick start (non-TLS)
+#  ---------------------
+#  1) Create the network once (Compose will also do this, but explicit is nice):
+#       docker network create rnet || true
+#  2) Launch:
+#       docker compose up -d
+#  3) Watch logs (see cluster build and slot coverage):
+#       docker compose logs -f
+#  4) Check cluster from inside any node:
+#       docker exec -it r1 redis-cli -p 6379 cluster nodes
+#     Or from the host (requires redis-cli installed on host):
+#       redis-cli -h 127.0.0.1 -p 6379 cluster info
+#
+#  Tear down (keeps volumes/data)
+#  ------------------------------
+#       docker compose down
+#
+#  Reset EVERYTHING (destroys data)
+#  --------------------------------
+#       docker compose down -v
+#
+#  Ports & access
+#  --------------
+#  • This reference file does NOT publish host ports. All traffic flows inside the rnet network.
+#  • To access from your host, add (for a single node, e.g. r1):
+#       ports: ["6379:6379","16379:16379"]
+#    …but for production you typically put clients next to the cluster or behind a proxy.
+#
+#  Health
+#  ------
+#  • The image ships a HEALTHCHECK that pings Redis and (when cluster is enabled) verifies
+#    cluster_state:ok. Orchestrators will mark nodes unhealthy if they degrade.
+#
+#  Passwords & ACL (optional)
+#  --------------------------
+#  • For development we allow empty passwords (ALLOW_EMPTY_PASSWORD=yes). DO NOT do this in prod.
+#  • For auth, set REDIS_PASSWORD (and optionally REDIS_ACLFILE / REDIS_ACL_USERNAME if you use ACL).
+#
+#  TLS (optional)
+#  --------------
+#  • Enable TLS by setting:
+#      REDIS_TLS_ENABLED=yes
+#      REDIS_TLS_PORT_NUMBER=6379      # or any other port; consider disabling plaintext with REDIS_PORT_NUMBER=0
+#      REDIS_TLS_CERT_FILE=/app/etc/tls/server.crt
+#      REDIS_TLS_KEY_FILE=/app/etc/tls/server.key
+#      REDIS_TLS_CA_FILE=/app/etc/tls/ca.crt   # or REDIS_TLS_CA_DIR=/app/etc/tls/ca
+#    Mount your certs into the container(s). The healthcheck & cluster scripts honor these vars.
+#
+#  Environment contract (keys you’ll most often touch)
+#  ---------------------------------------------------
+#    REDIS_PORT_NUMBER                 -> Plaintext data port (default 6379)
+#    REDIS_NODES                       -> Comma/space/semicolon list of "host:port" peers
+#    REDIS_CLUSTER_CREATOR             -> "yes" on exactly ONE node (r1 here) to create the cluster
+#    REDIS_CLUSTER_REPLICAS            -> Replicas per master (1 = 3 masters + 3 replicas)
+#    REDIS_CLUSTER_ANNOUNCE_HOSTNAME   -> Hostname announced to peers (use docker DNS names)
+#    REDIS_CLUSTER_ANNOUNCE_IP         -> IP to announce (set when DYNAMIC_IPS=no)
+#    REDIS_CLUSTER_ANNOUNCE_PORT       -> Data port to announce (optional, else defaults)
+#    REDIS_CLUSTER_ANNOUNCE_BUS_PORT   -> Cluster bus port to announce (optional; default is data+10000)
+#
+#  Notes on announce variables
+#  ---------------------------
+#  • Use the *CLUSTER* names below (they map to Redis cluster-announce-*):
+#      REDIS_CLUSTER_ANNOUNCE_HOSTNAME / _IP / _PORT / _BUS_PORT
+#  • Deprecated aliases like REDIS_ANNOUNCE_IP/PORT/BUS_PORT are NOT used here.
+#
+#  Scaling / topology tweaks
+#  -------------------------
+#  • For 3 nodes (1 replica): keep r1..r3, set REDIS_CLUSTER_REPLICAS=1, list only those nodes in REDIS_NODES.
+#  • For more replicas: increase REDIS_CLUSTER_REPLICAS and add more services/volumes.
+#  • You must have (#nodes) >= (masters + replicas) and an even distribution is recommended.
+#
+#  Logs & troubleshooting
+#  ----------------------
+#  • `docker compose logs -f r1` — watch the creator node; it orchestrates `--cluster create`.
+#  • If cluster doesn’t reach "All 16384 slots covered", ensure all nodes can DNS-resolve each other
+#    (Compose service names on the same bridge) and that announce ports/IP/hostnames are consistent.
+#
+# =============================================================================
+
+services:
+  r1:
+    image: niceos/redis-cluster:8.2.1
+    container_name: r1
+    hostname: r1
+    volumes:
+      - r1-data:/app/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+      # List peers (exclude self). Comma or space separated are both fine.
+      - REDIS_NODES=r2:6379,r3:6379,r4:6379,r5:6379,r6:6379
+      # Cluster settings
+      - REDIS_CLUSTER_REPLICAS=1
+      - REDIS_CLUSTER_CREATOR=yes              # exactly one creator
+      # Announce (prefer hostnames on the Compose network)
+      - REDIS_CLUSTER_ANNOUNCE_HOSTNAME=r1
+      - REDIS_CLUSTER_ANNOUNCE_IP=r1
+      - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
+      # Verbose NiceOS logs (development)
+      - NICEOS_DEBUG=true
+      - NICEOS_TRACE=true
+    networks: [rnet]
+
+  r2:
+    image: niceos/redis-cluster:8.2.1
+    container_name: r2
+    hostname: r2
+    volumes:
+      - r2-data:/app/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+      - REDIS_NODES=r1:6379,r3:6379,r4:6379,r5:6379,r6:6379
+      - REDIS_CLUSTER_ANNOUNCE_HOSTNAME=r2
+      - REDIS_CLUSTER_ANNOUNCE_IP=r2
+      - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
+    networks: [rnet]
+
+  r3:
+    image: niceos/redis-cluster:8.2.1
+    container_name: r3
+    hostname: r3
+    volumes:
+      - r3-data:/app/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+      - REDIS_NODES=r1:6379,r2:6379,r4:6379,r5:6379,r6:6379
+      - REDIS_CLUSTER_ANNOUNCE_HOSTNAME=r3
+      - REDIS_CLUSTER_ANNOUNCE_IP=r3
+      - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
+    networks: [rnet]
+
+  r4:
+    image: niceos/redis-cluster:8.2.1
+    container_name: r4
+    hostname: r4
+    volumes:
+      - r4-data:/app/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+      - REDIS_NODES=r1:6379,r2:6379,r3:6379,r5:6379,r6:6379
+      - REDIS_CLUSTER_ANNOUNCE_HOSTNAME=r4
+      - REDIS_CLUSTER_ANNOUNCE_IP=r4
+      - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
+    networks: [rnet]
+
+  r5:
+    image: niceos/redis-cluster:8.2.1
+    container_name: r5
+    hostname: r5
+    volumes:
+      - r5-data:/app/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+      - REDIS_NODES=r1:6379,r2:6379,r3:6379,r4:6379,r6:6379
+      - REDIS_CLUSTER_ANNOUNCE_HOSTNAME=r5
+      - REDIS_CLUSTER_ANNOUNCE_IP=r5
+      - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
+    networks: [rnet]
+
+  r6:
+    image: niceos/redis-cluster:8.2.1
+    container_name: r6
+    hostname: r6
+    volumes:
+      - r6-data:/app/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+      - REDIS_NODES=r1:6379,r2:6379,r3:6379,r4:6379,r5:6379
+      - REDIS_CLUSTER_ANNOUNCE_HOSTNAME=r6
+      - REDIS_CLUSTER_ANNOUNCE_IP=r6
+      - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
+    networks: [rnet]
+
+networks:
+  rnet:
+    name: rnet
+    driver: bridge
+
+volumes:
+  r1-data: {}
+  r2-data: {}
+  r3-data: {}
+  r4-data: {}
+  r5-data: {}
+  r6-data: {}
