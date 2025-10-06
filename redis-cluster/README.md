@@ -1,18 +1,14 @@
-# NiceOS Redis® / Redis® Cluster — Documentation Plan (better-than-Bitnami)
+# NiceOS Redis® / Redis® Cluster
 
 ## 0) Front-matter
 
 * **Title:** *NiceOS package for Redis® / Redis® Cluster*
 
-* **Short synopsis (elevator pitch):**
+* **Short synopsis:**
   Ship a production-ready Redis/Redis Cluster in seconds 🚀. The NiceOS image provides **opinionated, secure defaults**, **idempotent configuration**, and **deterministic cluster bootstrapping**—with first-class **TLS**, **ACLs**, and **health checks**. It’s drop-in compatible with common Bitnami environment variables (plus helpful NiceOS extras), logs cleanly to stdout/stderr, and keeps all runtime state under `/app` for tidy persistence and backups. Whether you’re spinning up a single dev node or a 3-masters/3-replicas cluster, you get reproducible behavior, clear observability, and a path to hardened deployments in containers or Kubernetes 🧰.
 
 * **Trademark disclaimer:**
   *Redis is a registered trademark of Redis Ltd. Any rights therein are reserved to Redis Ltd. Any use by NiceOS is for referential purposes only and does not indicate any sponsorship, endorsement, or affiliation between Redis Ltd. and NiceOS.*
-
-* **Badges (minimal, useful set):**
-
-  > Use these at the top of the README for quick scannability. Replace placeholders as appropriate.
 
   [![Image Size](https://img.shields.io/docker/image-size/niceos/redis-cluster/latest?logo=docker\&label=image%20size)](https://hub.docker.com/r/niceos/redis-cluster)
   [![Architectures](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-informational)](#)
@@ -21,16 +17,6 @@
   [![Provenance/Attestation](https://img.shields.io/badge/provenance-SLSA%203-brightgreen)](#)
   [![Container Healthcheck](https://img.shields.io/badge/healthcheck-enabled-brightgreen)](#)
   [![Redis](https://img.shields.io/badge/Redis-6%2B%20%7C%207%2B-red?logo=redis)](https://redis.io)
-
-  **Why these badges?**
-
-  * **Image Size**: helps ops estimate pull times and storage ⏬
-  * **Architectures**: shows multi-arch support 🧩
-  * **License**: compliance at a glance ⚖️
-  * **SBOM**: signals supply-chain transparency 📄
-  * **Provenance/Attestation**: build integrity (e.g., SLSA-aligned) 🔐
-  * **Healthcheck**: indicates built-in liveness/readiness tooling ❤️‍🩹
-  * **Redis version**: clarifies upstream compatibility 🔢
 
 ---
 
